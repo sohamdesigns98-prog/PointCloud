@@ -1,0 +1,161 @@
+/* Leave mode — full-viewport screens over the particle garden */
+
+.leave-mode {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.leave-mode.is-active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.leave-mode[hidden] {
+  display: none;
+}
+
+.leave-screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: max(1.25rem, env(safe-area-inset-top)) 1.35rem
+    max(1.5rem, env(safe-area-inset-bottom));
+  background: rgba(0, 0, 0, 0.55);
+  overflow: auto;
+}
+
+.leave-screen-inner {
+  width: min(28rem, 100%);
+  margin: auto 0;
+  padding: 0.25rem 0 1rem;
+}
+
+.leave-top-close {
+  position: absolute;
+  top: max(1rem, env(safe-area-inset-top));
+  right: 1.25rem;
+  z-index: 2;
+  border: 1px solid rgba(226, 216, 202, 0.22);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--paper-muted);
+  font: inherit;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 0.45rem 0.9rem;
+}
+
+.leave-top-close:hover {
+  color: var(--paper);
+  border-color: rgba(226, 216, 202, 0.45);
+}
+
+.leave-kicker {
+  margin: 0 0 0.75rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.leave-hero {
+  margin: 0 0 1rem;
+  font-family: var(--mono);
+  font-weight: 400;
+  font-size: clamp(1.35rem, 4.2vw, 1.85rem);
+  line-height: 1.3;
+  color: var(--paper);
+}
+
+.leave-status,
+.leave-transcript {
+  margin: 0 0 1.25rem;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--paper-muted);
+}
+
+.leave-place {
+  margin: -0.35rem 0 1.5rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+
+.leave-transcript:empty {
+  display: none;
+}
+
+.leave-type-wrap {
+  margin: 0.35rem 0 0.85rem;
+}
+
+.leave-screen--compose .pill--ghost[data-record] {
+  display: inline-flex;
+  margin: 0.15rem auto 0.35rem;
+}
+
+.leave-screen--compose .leave-status {
+  margin: 0 0 0.75rem;
+  text-align: center;
+}
+
+.leave-screen--compose .pill--ghost[data-record].is-recording {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.leave-type-wrap textarea,
+.leave-screen textarea {
+  width: 100%;
+  margin: 0;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid rgba(226, 216, 202, 0.22);
+  border-radius: 1.25rem;
+  background: rgba(0, 0, 0, 0.4);
+  color: var(--paper);
+  font: inherit;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.leave-type-count {
+  margin: 0.4rem 0 0;
+  font-size: 0.68rem;
+  color: var(--paper-faint);
+  text-align: right;
+}
+
+/* Garden dimmed while leave mode owns the foreground */
+#app.is-leave-mode .chrome,
+#app.is-leave-mode .hint,
+#app.is-leave-mode .memory-sheet,
+#app.is-leave-mode .memory-panel,
+#app.is-leave-mode .focus-title,
+#app.is-leave-mode .look-prompt {
+  opacity: 0 !important;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+#app.is-leave-mode #garden {
+  filter: brightness(0.55);
+  transition: filter 0.45s ease;
+}
+
+@media (min-width: 720px) {
+  .leave-screen {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}

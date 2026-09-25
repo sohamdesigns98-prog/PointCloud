@@ -1,0 +1,16 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+/Users/soham/Documents/UTS/IDS/Concept/still-here-garden/src/main.js
+   218:5   warning  'lastHeard' is assigned a value but never used  no-unused-vars
+   940:16  warning  'enterGarden' is defined but never used         no-unused-vars
+   990:10  warning  'showWhyPass' is defined but never used         no-unused-vars
+  1043:10  warning  'openMenu' is defined but never used            no-unused-vars
+
+/Users/soham/Documents/UTS/IDS/Concept/still-here-garden/src/sampleMesh.js
+  331:9  warning  'sx' is assigned a value but never used  no-unused-vars
+
+/Users/soham/Documents/UTS/IDS/Concept/still-here-garden/src/screens/LeaveMemory.js
+  4:17  warning  'MAX_PASS_NAME' is defined but never used  no-unused-vars
+
+✖ 6 problems (0 errors, 6 warnings)
+
