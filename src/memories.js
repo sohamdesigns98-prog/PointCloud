@@ -14,18 +14,17 @@ export const REGION_LABELS = {
   forecourt: "The forecourt",
 };
 
-export const MAX_BODY_CHARS = 280;
+export const MAX_BODY_CHARS = 400;
+export const MIN_BODY_CHARS = 20;
 
-export const LEAVE_PROMPT =
-  "What happened here that you might still remember later?";
+export const LEAVE_PROMPT = "What happened here?";
 
-/** Short unpolished title from body text. */
+/** Short unpolished title from body text (first five words). */
 export function autoTitleFromBody(body = "") {
   const cleaned = String(body).trim().replace(/\s+/g, " ");
   if (!cleaned) return "A memory";
-  const first = cleaned.split(/[.!?]/)[0]?.trim() || cleaned;
-  const words = first.split(" ").slice(0, 4).join(" ");
-  const title = words.length > 28 ? `${words.slice(0, 26).trim()}…` : words;
+  const words = cleaned.split(" ").slice(0, 5).join(" ");
+  const title = words.length > 48 ? `${words.slice(0, 46).trim()}…` : words;
   return title || "A memory";
 }
 

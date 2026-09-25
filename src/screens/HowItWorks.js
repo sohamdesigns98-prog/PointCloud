@@ -62,8 +62,8 @@ const STEPS = [
   {
     id: "garden-leave",
     scene: "garden",
-    body: "Leave a memory of your own when you’re ready — signed by your Memory Pass.",
-    target: "#btn-leave",
+    body: "Leave a memory of your own when you’re ready — tap Add your memory.",
+    target: "#btn-add-memory",
     fallbackTarget: "#btn-pass",
     prefer: ["above", "left", "bottom-left", "top-left"],
   },

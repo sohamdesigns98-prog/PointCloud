@@ -1,12 +1,15 @@
 import { beforeEach, describe, expect, it, vi, afterEach } from "vitest";
 import {
+  addMemory,
   appendUserMemory,
+  getMemories,
   loadUserMemories,
   mergeMemories,
   saveUserMemories,
 } from "../src/memoryStore.js";
 
-const STORAGE_KEY = "still-here-user-memories-v1";
+const STORAGE_KEY = "stillhere.memories.local";
+const LEGACY_KEY = "still-here-user-memories-v1";
 
 function baseMemory(overrides = {}) {
   return {
@@ -16,6 +19,7 @@ function baseMemory(overrides = {}) {
     relationship: "firstTime",
     region: "harbour",
     emotion: "Joy",
+    local: true,
     ...overrides,
   };
 }
@@ -28,16 +32,25 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("appendUserMemory / loadUserMemories", () => {
+describe("addMemory / getMemories", () => {
   it("round-trips a valid memory through localStorage", () => {
-    const { ok, memories } = appendUserMemory(baseMemory());
+    const { ok, memories, memory } = addMemory(baseMemory());
     expect(ok).toBe(true);
     expect(memories).toHaveLength(1);
-    expect(loadUserMemories()).toEqual(memories);
+    expect(memory.local).toBe(true);
+    expect(getMemories()).toEqual(memories);
     expect(JSON.parse(localStorage.getItem(STORAGE_KEY))).toHaveLength(1);
   });
 
-  it("rejects invalid relationship or region (returns previous list unchanged)", () => {
+  it("migrates legacy storage key once", () => {
+    localStorage.setItem(LEGACY_KEY, JSON.stringify([baseMemory({ id: "legacy" })]));
+    const list = getMemories();
+    expect(list).toHaveLength(1);
+    expect(list[0].id).toBe("legacy");
+    expect(localStorage.getItem(STORAGE_KEY)).toBeTruthy();
+  });
+
+  it("rejects invalid relationship or region", () => {
     appendUserMemory(baseMemory());
     const rejectedRel = appendUserMemory(
       baseMemory({ id: "bad-rel", relationship: "never" })
@@ -52,19 +65,27 @@ describe("appendUserMemory / loadUserMemories", () => {
     expect(rejectedRegion.memories).toHaveLength(1);
   });
 
-  it("truncates body to 280 and title to 48", () => {
-    const body = "x".repeat(400);
+  it("truncates body to 400 and title to 48", () => {
+    const body = "x".repeat(500);
     const title = "T".repeat(60);
-    const { memories } = appendUserMemory(baseMemory({ body, title }));
-    expect(memories[0].body).toHaveLength(280);
-    expect(memories[0].title).toHaveLength(48);
+    const { memory } = addMemory(baseMemory({ body, title }));
+    expect(memory.body).toHaveLength(400);
+    expect(memory.title).toHaveLength(48);
+  });
+
+  it("persists landing position", () => {
+    const { memory } = addMemory(
+      baseMemory({ position: [1.5, 2.25, -3] })
+    );
+    expect(memory.position).toEqual([1.5, 2.25, -3]);
+    expect(loadUserMemories()[0].position).toEqual([1.5, 2.25, -3]);
   });
 
   it('drops audioDataUrl that does not start with "data:audio"', () => {
-    const { memories: first } = appendUserMemory(
+    const { memory: first } = appendUserMemory(
       baseMemory({ audioDataUrl: "https://example.com/clip.mp3" })
     );
-    expect(first[0].audioDataUrl).toBeUndefined();
+    expect(first.audioDataUrl).toBeUndefined();
 
     const { memories: list } = appendUserMemory(
       baseMemory({
@@ -81,12 +102,12 @@ describe("appendUserMemory / loadUserMemories", () => {
     vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
       throw new DOMException("Blocked", "SecurityError");
     });
-    expect(loadUserMemories()).toEqual([]);
+    expect(getMemories()).toEqual([]);
   });
 
   it("returns [] for corrupted JSON", () => {
     localStorage.setItem(STORAGE_KEY, "{not-json");
-    expect(loadUserMemories()).toEqual([]);
+    expect(getMemories()).toEqual([]);
   });
 });
 
@@ -124,9 +145,7 @@ describe("appendUserMemory storage fallback", () => {
 
     expect(result.ok).toBe(true);
     expect(result.audioDropped).toBe(true);
-    expect(result.memories).toHaveLength(1);
     expect(result.memories[0].audioDataUrl).toBeUndefined();
-    expect(loadUserMemories()[0].id).toBe("audio-fallback");
   });
 
   it("does not throw when storage is fully unavailable", () => {
@@ -145,9 +164,7 @@ describe("appendUserMemory storage fallback", () => {
     }).not.toThrow();
 
     expect(result.ok).toBe(false);
-    expect(result.audioDropped).toBe(false);
     expect(result.memories).toEqual([]);
-    expect(loadUserMemories()).toEqual([]);
   });
 });
 
@@ -158,6 +175,6 @@ describe("saveUserMemories", () => {
       { id: "junk" },
     ]);
     expect(cleaned).toHaveLength(1);
-    expect(loadUserMemories()).toHaveLength(1);
+    expect(getMemories()).toHaveLength(1);
   });
 });

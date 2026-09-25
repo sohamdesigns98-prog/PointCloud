@@ -10,7 +10,7 @@ import { createOpener } from "./screens/Opener.js";
 import { createHowItWorks, hasCompletedWalkthrough } from "./screens/HowItWorks.js";
 import { createLocations } from "./screens/Locations.js";
 import { createMakePass } from "./screens/MakePass.js";
-import { createLeaveMemory } from "./screens/LeaveMemory.js";
+import { createAddMemory } from "./screens/AddMemory.js";
 import { createAmbience } from "./ambience.js";
 import { createSydneyMap } from "./sydneyMap.js";
 import {
@@ -20,6 +20,7 @@ import {
 } from "./bookmarkStore.js";
 import { normalizeEmotion } from "./emotions.js";
 import gsap from "gsap";
+import "./arrival/arrival.css";
 
 /**
  * Flow: Opener → Sydney map → Opera House garden → How / Why / Pass / Leave
@@ -206,8 +207,9 @@ const shellMount = document.querySelector("#shell-mount");
 const leaveMount = document.querySelector("#leave-mount");
 const dock = document.querySelector("#dock");
 const btnPass = document.querySelector("#btn-pass");
-const btnLeave = document.querySelector("#btn-leave");
-const btnHow = document.querySelector("#btn-how");
+const btnAddMemory = document.querySelector("#btn-add-memory");
+const arrivalNote = document.querySelector("#arrival-note");
+const memoryLeftBy = document.querySelector("#memory-left-by");
 
 const liveMemories = mergeMemories(seedMemories, loadUserMemories());
 if (countEl) countEl.textContent = memoryCountLabel(liveMemories.length);
@@ -281,12 +283,11 @@ function syncDock() {
   const pass = hasPass();
   const onGarden =
     (appMode === "garden" || appMode === "memorySheet") && dockReady;
-  if (btnHow) btnHow.hidden = !onGarden;
+  if (btnAddMemory) btnAddMemory.hidden = !onGarden;
   if (btnPass) {
     btnPass.hidden = !onGarden;
     btnPass.textContent = pass ? "Memory Pass" : "Make your pass";
   }
-  if (btnLeave) btnLeave.hidden = !(onGarden && pass);
   if (btnSaved) btnSaved.hidden = !onGarden;
   dock?.classList.toggle("dock--single", false);
 }
@@ -406,10 +407,56 @@ async function openSavedMemory(id) {
   gardenApi?.focusMemoryById?.(id);
 }
 
-function refreshCount() {
+function refreshCount({ animate = false } = {}) {
   const n = gardenApi?.getMemoryCount?.() ?? liveMemories.length;
-  if (countEl) countEl.textContent = memoryCountLabel(n);
+  if (!countEl) return;
+  if (!animate) {
+    countEl.textContent = memoryCountLabel(n);
+    locations?.refresh?.();
+    return;
+  }
+  const prev = Number(countEl.dataset.count || n - 1);
+  countEl.dataset.count = String(n);
+  const proxy = { v: prev };
+  gsap.to(proxy, {
+    v: n,
+    duration: 0.7,
+    ease: "power2.out",
+    onUpdate() {
+      countEl.textContent = memoryCountLabel(Math.round(proxy.v));
+    },
+    onComplete() {
+      countEl.textContent = memoryCountLabel(n);
+    },
+  });
   locations?.refresh?.();
+}
+
+function showArrivalNote(id) {
+  if (!arrivalNote) return;
+  arrivalNote.hidden = false;
+  arrivalNote.innerHTML = `
+    <span>Your memory is among them.</span>
+    <button type="button" class="arrival-note-btn" data-see>See it</button>
+    <button type="button" class="arrival-note-btn" data-another>Leave another</button>
+  `;
+  arrivalNote.querySelector("[data-see]")?.addEventListener("click", () => {
+    hideArrivalNote();
+    if (id) gardenApi?.focusMemoryById?.(id);
+  });
+  arrivalNote.querySelector("[data-another]")?.addEventListener("click", () => {
+    hideArrivalNote();
+    leaveApp?.open?.();
+  });
+  window.clearTimeout(showArrivalNote._timer);
+  showArrivalNote._timer = window.setTimeout(() => hideArrivalNote(), 16000);
+}
+
+function hideArrivalNote() {
+  if (!arrivalNote) return;
+  arrivalNote.hidden = true;
+  arrivalNote.innerHTML = "";
+  window.clearTimeout(showArrivalNote._timer);
 }
 
 const ui = {
@@ -489,6 +536,8 @@ const ui = {
     title,
     emotion,
     place = "Opera House",
+    local = false,
+    authorName = "",
     origin = null,
     ring = null,
   }) {
@@ -515,6 +564,15 @@ const ui = {
     memoryRelationship.textContent = mood
       ? `${mood}${relationship ? ` · ${relationship}` : ""}`
       : relationship || "";
+    if (memoryLeftBy) {
+      if (local || authorName) {
+        memoryLeftBy.hidden = false;
+        memoryLeftBy.textContent = "Left by you";
+      } else {
+        memoryLeftBy.hidden = true;
+        memoryLeftBy.textContent = "";
+      }
+    }
     memoryBody.textContent = body;
     syncSaveButton();
     if (memoryAudio) {
@@ -620,6 +678,10 @@ const ui = {
         memoryAudio.pause?.();
         memoryAudio.removeAttribute("src");
         memoryAudio.hidden = true;
+      }
+      if (memoryLeftBy) {
+        memoryLeftBy.hidden = true;
+        memoryLeftBy.textContent = "";
       }
       lastMemoryOrigin = null;
       lastMemoryRing = null;
@@ -729,10 +791,9 @@ const ui = {
     hint?.classList.add("fade");
   },
   nudgeLeaveMemory() {
-    if (!hasPass()) return;
-    if (appMode !== "garden" || !btnLeave || btnLeave.hidden) return;
-    btnLeave.classList.add("pill--pulse");
-    window.setTimeout(() => btnLeave.classList.remove("pill--pulse"), 2400);
+    if (appMode !== "garden" || !btnAddMemory || btnAddMemory.hidden) return;
+    btnAddMemory.classList.add("pill--pulse");
+    window.setTimeout(() => btnAddMemory.classList.remove("pill--pulse"), 2400);
   },
 };
 
@@ -757,24 +818,66 @@ function ensureGarden() {
       gardenApi = garden;
       gardenApi.setEmotionFilter(emotionFilterSelect?.value || "All");
       status.remove();
-      leaveApp = createLeaveMemory({
+      leaveApp = createAddMemory({
         mount: leaveMount || app,
         garden: gardenApi,
         onEnter() {
           setAppMode("leave");
+          hideArrivalNote();
           ui.hideMemory({ immediate: true });
-          gardenApi.setBackgroundMode?.(true);
         },
         onExit() {
           setAppMode("garden");
-          gardenApi.setBackgroundMode?.(false);
           syncDock();
         },
-        onCountChange: refreshCount,
-        onComplete(id) {
-          if (id) gardenApi.focusMemoryById?.(id);
+        onCountChange: () => refreshCount({ animate: true }),
+        onComplete() {},
+        onOpenPass() {
+          leaveApp?.close?.();
+          openMemoryPass({ forceCreate: true });
+        },
+        onArrivalNote(id) {
+          showArrivalNote(id);
         },
       });
+      if (import.meta.env.DEV) {
+        window.addEventListener("keydown", (e) => {
+          if (e.key !== "m" && e.key !== "M") return;
+          if (e.metaKey || e.ctrlKey || e.altKey) return;
+          if (appMode !== "garden") return;
+          const target = document.activeElement;
+          if (
+            target &&
+            (target.tagName === "INPUT" ||
+              target.tagName === "TEXTAREA" ||
+              target.isContentEditable)
+          ) {
+            return;
+          }
+          const pos =
+            gardenApi.resolveLandingPosition?.("sails") || [0, 2, 0];
+          void gardenApi.runArrival?.({
+            text: "I stood here longer than I meant to.",
+            emotion: "Nostalgia",
+            targetPosition: pos,
+            onLand: () => {
+              gardenApi.addMemory?.({
+                id: `dev-${Date.now().toString(36)}`,
+                title: "I stood here longer",
+                body: "I stood here longer than I meant to.",
+                relationship: "firstTime",
+                region: "sails",
+                emotion: "Nostalgia",
+                place: "Opera House",
+                local: true,
+                position: pos,
+                landingPulseMs: 10000,
+              });
+              refreshCount({ animate: true });
+            },
+          });
+        });
+      }
       return garden;
     })
     .catch((err) => {
@@ -1003,15 +1106,10 @@ function boot() {
     onEditPass: () => openMemoryPass({ mode: "edit" }),
   });
 
-  btnLeave?.addEventListener("click", () => {
+  btnAddMemory?.addEventListener("click", () => {
     if (appMode !== "garden" && appMode !== "memorySheet") return;
-    if (!hasPass()) {
-      openMemoryPass({ forceCreate: true });
-      return;
-    }
     leaveApp?.open?.();
   });
-  btnHow?.addEventListener("click", () => showHowItWorks());
   btnMapWalkthrough?.addEventListener("click", () =>
     showHowItWorks({ from: "map" })
   );

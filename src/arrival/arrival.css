@@ -1,0 +1,26 @@
+.arrival-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  padding: 1.5rem;
+}
+
+.arrival-overlay--reduced .arrival-words {
+  text-shadow: 0 0 24px rgba(224, 196, 154, 0.45);
+}
+
+.arrival-words {
+  margin: 0;
+  max-width: min(36rem, 92vw);
+  text-align: center;
+  font-family: var(--mono);
+  font-weight: 400;
+  font-size: clamp(1.1rem, 3.6vw, 1.65rem);
+  line-height: 1.45;
+  letter-spacing: 0.02em;
+  color: var(--paper, #f2ebe0);
+  text-shadow: 0 0 0 transparent;
+}

@@ -3,9 +3,18 @@ import { EMOTIONS } from "../src/emotions.js";
 import {
   autoTitleFromBody,
   memories,
+  MAX_BODY_CHARS,
+  MIN_BODY_CHARS,
   REGION_LABELS,
   RELATIONSHIP_LABELS,
 } from "../src/memories.js";
+
+describe("body limits", () => {
+  it("exposes 20–400 character bounds", () => {
+    expect(MIN_BODY_CHARS).toBe(20);
+    expect(MAX_BODY_CHARS).toBe(400);
+  });
+});
 
 describe("autoTitleFromBody", () => {
   it('returns "A memory" for empty input', () => {
@@ -13,23 +22,22 @@ describe("autoTitleFromBody", () => {
     expect(autoTitleFromBody("   ")).toBe("A memory");
   });
 
-  it("uses up to the first four words of the first sentence", () => {
+  it("uses up to the first five words", () => {
     expect(autoTitleFromBody("We sat on the steps until late.")).toBe(
-      "We sat on the"
+      "We sat on the steps"
     );
   });
 
-  it("stops at the first sentence boundary", () => {
-    expect(autoTitleFromBody("Quiet. Then the ferry horn.")).toBe("Quiet");
+  it("keeps short bodies as-is when under five words", () => {
+    expect(autoTitleFromBody("Quiet harbour light")).toBe("Quiet harbour light");
   });
 
-  it("ellipsizes when the four-word span is longer than 28 chars", () => {
-    // Characterize: words joined, then slice(0, 26) + … if length > 28
+  it("ellipsizes when the five-word span is longer than 48 chars", () => {
     const title = autoTitleFromBody(
-      "Extraordinary circumstances surround everything here tonight."
+      "Supercalifragilisticexpialidocious wonderful magnificent extraordinary breathtaking view"
     );
     expect(title.endsWith("…")).toBe(true);
-    expect(title.length).toBeLessThanOrEqual(27);
+    expect(title.length).toBeLessThanOrEqual(48);
   });
 });
 

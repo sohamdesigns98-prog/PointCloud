@@ -129,14 +129,11 @@
       </div>
 
       <nav class="dock chrome-hidden" id="dock" aria-label="Garden actions">
-        <button type="button" class="pill pill--dock" id="btn-how">
-          How it works
+        <button type="button" class="pill pill--dock" id="btn-add-memory" hidden>
+          Add your memory
         </button>
         <button type="button" class="pill pill--dock" id="btn-pass" hidden>
           Memory Pass
-        </button>
-        <button type="button" class="pill pill--dock" id="btn-leave" hidden>
-          Leave a memory
         </button>
       </nav>
 
@@ -158,9 +155,11 @@
           <p class="focus-title-text" id="focus-title-text"></p>
         </div>
         <p class="count" id="memory-count">memories live here</p>
-        <p class="hint" id="hint">
-          Brush through the place. Tap a point to hold a memory.
+        <p class="hint" id="hint" data-coach>
+          Brush the sails. Tap a glow to read a memory. Filter by feeling anytime.
+          When you’re ready, add one of your own.
         </p>
+        <p class="arrival-note" id="arrival-note" hidden></p>
       </footer>
 
       <div class="memory-sheet" id="memory-sheet" hidden>
@@ -183,6 +182,7 @@
             <div class="memory-panel-meta">
               <p class="memory-title" id="memory-title"></p>
               <p class="relationship" id="memory-relationship"></p>
+              <p class="memory-left-by" id="memory-left-by" hidden></p>
             </div>
           </header>
           <p class="body" id="memory-body"></p>

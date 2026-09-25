@@ -16,6 +16,12 @@ npm run dev
 
 Open the local URL (default `http://localhost:5173`).
 
+## GitHub
+
+git add .
+git commit -m "Describe what I changed"
+git push
+
 ## Journey
 
 1. **Opener** — concept copy → Enter experience

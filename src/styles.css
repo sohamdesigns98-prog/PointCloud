@@ -380,6 +380,19 @@ body {
   color: rgba(224, 196, 154, 0.72);
 }
 
+.memory-left-by {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(226, 216, 202, 0.55);
+}
+
+.memory-left-by[hidden] {
+  display: none;
+}
+
 .memory-title {
   margin: 0;
   font-family: var(--mono);
@@ -824,6 +837,40 @@ body {
 
 .hint.fade {
   opacity: 0;
+}
+
+.arrival-note {
+  margin: 0.65rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem 0.75rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  color: var(--paper-muted);
+}
+
+.arrival-note[hidden] {
+  display: none;
+}
+
+.arrival-note-btn {
+  border: 1px solid rgba(226, 216, 202, 0.28);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--paper);
+  font: inherit;
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 0.35rem 0.75rem;
+  cursor: pointer;
+}
+
+.arrival-note-btn:hover {
+  border-color: rgba(224, 196, 154, 0.5);
+  color: #e0c49a;
 }
 
 .memory-audio[hidden] {

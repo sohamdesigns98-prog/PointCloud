@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import gsap from "gsap";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
@@ -33,6 +34,7 @@ import {
 import { createMemoryMarker, projectToCanvas } from "./memoryMarker.js";
 import { emotionMatchesFilter, normalizeEmotion } from "./emotions.js";
 import { getAura } from "./pass/auras.js";
+import { playArrival } from "./arrival/arrivalAnimation.js";
 
 /** Perf target for sails + podium (ground filtered out). */
 const STRUCTURE_TARGET = 45000;
@@ -582,14 +584,22 @@ export async function createGarden(canvas, ui, options = {}) {
   let hasPointer = false;
   let interactionEnabled = false;
   let backgroundOnly = false;
+  let composeMode = false;
+  let highlightRegionId = null;
   let suppressPickUntilUp = false;
   let pulseUntil = 0;
+  let pulseDurationSec = PULSE_DURATION;
   let pulseCenter = new THREE.Vector3();
   const focusWorld = new THREE.Vector3();
   let clock = new THREE.Clock();
   let lookPromptTimer = 0;
   let nudgeLeaveTimer = 0;
   let pendingFocusId = null;
+  const composeCamPos = endCameraPos
+    .clone()
+    .add(new THREE.Vector3(0, 1.4, 5.5));
+  const structureOpacityRest = 0.96;
+  const hotspotOpacityRest = 0.95;
 
   ui.setChromeVisible?.(false);
 
@@ -912,8 +922,9 @@ export async function createGarden(canvas, ui, options = {}) {
 
     const pulsing = now < pulseUntil;
     if (pulsing) {
-      const pulseT = 1 - (pulseUntil - now) / PULSE_DURATION;
-      const pulseStrength = Math.sin(Math.min(1, pulseT) * Math.PI) * 0.35;
+      const dur = Math.max(0.1, pulseDurationSec);
+      const pulseT = 1 - (pulseUntil - now) / dur;
+      const pulseStrength = Math.sin(Math.min(1, Math.max(0, pulseT)) * Math.PI) * 0.35;
       const pr2 = PULSE_RADIUS * PULSE_RADIUS;
       for (let i = 0; i < structureCount; i++) {
         const ix = i * 3;
@@ -1201,6 +1212,7 @@ export async function createGarden(canvas, ui, options = {}) {
       hotspotRest[index * 3 + 1],
       hotspotRest[index * 3 + 2]
     );
+    pulseDurationSec = PULSE_DURATION;
     pulseUntil = performance.now() / 1000 + PULSE_DURATION;
 
     focusWorld.set(
@@ -1227,6 +1239,8 @@ export async function createGarden(canvas, ui, options = {}) {
       title: memory.title,
       emotion: memory.emotion || null,
       place: memory.place || "Opera House",
+      local: Boolean(memory.local),
+      authorName: memory.authorName || memory.author || "",
       origin,
       ring: makeRingApi(),
     });
@@ -1323,7 +1337,7 @@ export async function createGarden(canvas, ui, options = {}) {
     hotspotGeo.computeBoundingSphere();
   }
 
-  function placeOneByRegion(region, index) {
+  function findPlacementInRegion(region, excludeIndex = -1) {
     const center = regionCenters[region] || regionCenters.forecourt;
     const n = structureRest.length / 3;
     const stride = Math.max(1, Math.floor(n / 1200));
@@ -1353,7 +1367,7 @@ export async function createGarden(canvas, ui, options = {}) {
       const z = structureRest[i * 3 + 2];
       let nearest = Infinity;
       for (let h = 0; h < hotspotCount; h++) {
-        if (h === index) continue;
+        if (h === excludeIndex) continue;
         const dx = x - hotspotRest[h * 3];
         const dy = y - hotspotRest[h * 3 + 1];
         const dz = z - hotspotRest[h * 3 + 2];
@@ -1371,9 +1385,22 @@ export async function createGarden(canvas, ui, options = {}) {
         bestIdx = i;
       }
     }
-    hotspotRest[index * 3] = structureRest[bestIdx * 3];
-    hotspotRest[index * 3 + 1] = structureRest[bestIdx * 3 + 1];
-    hotspotRest[index * 3 + 2] = structureRest[bestIdx * 3 + 2];
+    return [
+      structureRest[bestIdx * 3],
+      structureRest[bestIdx * 3 + 1],
+      structureRest[bestIdx * 3 + 2],
+    ];
+  }
+
+  function placeOneByRegion(region, index) {
+    const [x, y, z] = findPlacementInRegion(region, index);
+    hotspotRest[index * 3] = x;
+    hotspotRest[index * 3 + 1] = y;
+    hotspotRest[index * 3 + 2] = z;
+  }
+
+  function resolveLandingPosition(region) {
+    return findPlacementInRegion(region || "forecourt", -1);
   }
 
   function suggestRegion() {
@@ -1421,8 +1448,18 @@ export async function createGarden(canvas, ui, options = {}) {
     hotspotMatch = nextMatch;
     hotspotCount += 1;
 
-    placeOneByRegion(memory.region || "forecourt", index);
     const ix = index * 3;
+    if (
+      Array.isArray(memory.position) &&
+      memory.position.length >= 3 &&
+      memory.position.every((n) => Number.isFinite(Number(n)))
+    ) {
+      hotspotRest[ix] = Number(memory.position[0]);
+      hotspotRest[ix + 1] = Number(memory.position[1]);
+      hotspotRest[ix + 2] = Number(memory.position[2]);
+    } else {
+      placeOneByRegion(memory.region || "forecourt", index);
+    }
     hotspotPositions[ix] = hotspotRest[ix];
     hotspotPositions[ix + 1] = hotspotRest[ix + 1];
     hotspotPositions[ix + 2] = hotspotRest[ix + 2];
@@ -1440,9 +1477,15 @@ export async function createGarden(canvas, ui, options = {}) {
       hotspotRest[ix + 1],
       hotspotRest[ix + 2]
     );
-    pulseUntil = performance.now() / 1000 + PULSE_DURATION * 1.4;
+    const landingMs =
+      Number(memory.landingPulseMs) > 0
+        ? Number(memory.landingPulseMs)
+        : PULSE_DURATION * 1.4 * 1000;
+    pulseDurationSec = landingMs / 1000;
+    pulseUntil = performance.now() / 1000 + pulseDurationSec;
 
-    return index;
+    const position = [hotspotRest[ix], hotspotRest[ix + 1], hotspotRest[ix + 2]];
+    return { index, position };
   }
 
   function focusMemoryById(id) {
@@ -1514,16 +1557,145 @@ export async function createGarden(canvas, ui, options = {}) {
       memoryMarker.setScale(1);
       memoryMarker.setOpacity(1);
       ui.hideFocusTitle?.();
-    } else if (interactionEnabled) {
+    } else if (interactionEnabled && !composeMode) {
       controls.enabled = true;
     }
+  }
+
+  function setComposeMode(active) {
+    composeMode = Boolean(active);
+    setBackgroundMode(composeMode);
+    gsap.killTweensOf(camera.position);
+    gsap.killTweensOf(structureMat.uniforms.uOpacity);
+    gsap.killTweensOf(hotspotMat.uniforms.uOpacity);
+    if (composeMode) {
+      gsap.to(structureMat.uniforms.uOpacity, {
+        value: structureOpacityRest * 0.65,
+        duration: 0.85,
+        ease: "power2.out",
+      });
+      gsap.to(hotspotMat.uniforms.uOpacity, {
+        value: hotspotOpacityRest * 0.7,
+        duration: 0.85,
+        ease: "power2.out",
+      });
+      gsap.to(camera.position, {
+        x: composeCamPos.x,
+        y: composeCamPos.y,
+        z: composeCamPos.z,
+        duration: 1.1,
+        ease: "power2.inOut",
+        onUpdate() {
+          camera.lookAt(fitCenter);
+          controls.target.copy(fitCenter);
+        },
+      });
+    } else {
+      highlightRegion(null);
+      gsap.to(structureMat.uniforms.uOpacity, {
+        value: structureOpacityRest,
+        duration: 0.7,
+        ease: "power2.out",
+      });
+      gsap.to(hotspotMat.uniforms.uOpacity, {
+        value: hotspotOpacityRest,
+        duration: 0.7,
+        ease: "power2.out",
+      });
+      gsap.to(camera.position, {
+        x: endCameraPos.x,
+        y: endCameraPos.y,
+        z: endCameraPos.z,
+        duration: 1.0,
+        ease: "power2.inOut",
+        onUpdate() {
+          camera.lookAt(fitCenter);
+          controls.target.copy(fitCenter);
+        },
+      });
+    }
+  }
+
+  function applyRegionHighlight() {
+    const center = highlightRegionId
+      ? regionCenters[highlightRegionId]
+      : null;
+    const r = 3.4;
+    const r2 = r * r;
+    for (let i = 0; i < hotspotCount; i++) {
+      if (!center) {
+        hotspotSizes[i] = HOTSPOT_BASE_SIZE * (hotspotMatch[i] ? 1 : 0.55);
+        continue;
+      }
+      const dx = hotspotRest[i * 3] - center.x;
+      const dy = hotspotRest[i * 3 + 1] - center.y;
+      const dz = hotspotRest[i * 3 + 2] - center.z;
+      const dSq = dx * dx + dy * dy + dz * dz;
+      const near = dSq < r2;
+      const w = near ? softFalloffStatic(Math.sqrt(dSq), r) : 0;
+      hotspotSizes[i] =
+        HOTSPOT_BASE_SIZE * (0.45 + w * 1.15) * (hotspotMatch[i] ? 1 : 0.55);
+    }
+    if (hotspotGeo?.attributes?.aSize) {
+      hotspotGeo.attributes.aSize.needsUpdate = true;
+    }
+    if (!center) {
+      if (emotionFilter !== "All") refreshStructureFilter();
+      else {
+        for (let i = 0; i < structureCount; i++) {
+          structureOpacities[i] = structureFilterOpacity[i] ?? 1;
+          structureSizes[i] =
+            structureBaseSizes[i] * (structureFilterSize[i] ?? 1);
+        }
+        if (structureGeo?.attributes?.aOpacity) {
+          structureGeo.attributes.aOpacity.needsUpdate = true;
+          structureGeo.attributes.aSize.needsUpdate = true;
+        }
+      }
+      return;
+    }
+    for (let i = 0; i < structureCount; i++) {
+      const dx = structureRest[i * 3] - center.x;
+      const dy = structureRest[i * 3 + 1] - center.y;
+      const dz = structureRest[i * 3 + 2] - center.z;
+      const dSq = dx * dx + dy * dy + dz * dz;
+      const w = dSq < r2 ? softFalloffStatic(Math.sqrt(dSq), r) : 0;
+      structureOpacities[i] = 0.35 + w * 0.65;
+      structureSizes[i] = structureBaseSizes[i] * (0.65 + w * 0.55);
+    }
+    if (structureGeo?.attributes?.aOpacity) {
+      structureGeo.attributes.aOpacity.needsUpdate = true;
+      structureGeo.attributes.aSize.needsUpdate = true;
+    }
+  }
+
+  function highlightRegion(region) {
+    highlightRegionId = region || null;
+    applyRegionHighlight();
+  }
+
+  function runArrival(opts = {}) {
+    return playArrival({
+      ...opts,
+      scene,
+      camera,
+      renderer,
+      controls,
+      bloomPass,
+      fitCenter,
+      mount: canvas.parentElement || document.body,
+    });
   }
 
   return {
     addMemory,
     suggestRegion,
+    resolveLandingPosition,
     focusMemoryById,
     setBackgroundMode,
+    setComposeMode,
+    highlightRegion,
+    runArrival,
     setEmotionFilter(next) {
       const value = !next || next === "All" ? "All" : normalizeEmotion(next) || "All";
       emotionFilter = value === "All" ? "All" : value;
@@ -1537,6 +1709,9 @@ export async function createGarden(canvas, ui, options = {}) {
     dispose() {
       cancelAnimationFrame(frame);
       intro.kill();
+      gsap.killTweensOf(camera.position);
+      gsap.killTweensOf(structureMat.uniforms.uOpacity);
+      gsap.killTweensOf(hotspotMat.uniforms.uOpacity);
       window.clearTimeout(lookPromptTimer);
       window.clearTimeout(nudgeLeaveTimer);
       lookPromptTimer = 0;
@@ -1613,7 +1788,22 @@ function placeHotspotsSpread(
   });
 
   for (const m of order) {
-    const region = memoriesList[m].region;
+    const mem = memoriesList[m];
+    if (
+      Array.isArray(mem?.position) &&
+      mem.position.length >= 3 &&
+      mem.position.every((n) => Number.isFinite(Number(n)))
+    ) {
+      const x = Number(mem.position[0]);
+      const y = Number(mem.position[1]);
+      const z = Number(mem.position[2]);
+      placed.push({ x, y, z });
+      hotspotRest[m * 3] = x;
+      hotspotRest[m * 3 + 1] = y;
+      hotspotRest[m * 3 + 2] = z;
+      continue;
+    }
+    const region = mem.region;
     const center = centers[region] || centers.forecourt || centers.sails;
     let bestIdx = 0;
     let bestScore = -Infinity;
